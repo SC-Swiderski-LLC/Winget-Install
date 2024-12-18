@@ -1,3 +1,144 @@
+# Guide: Using Winget-Install with Intune
+
+This guide explains how to use the `winget-install.ps1` and `winget-detect.ps1` scripts to create and deploy Intune packages for application management using Winget.
+
+---
+
+## Overview
+
+These scripts enable administrators to deploy and manage applications via Intune (or SCCM) using Microsoft's **Winget** package manager. You can:
+
+1. Install applications.
+2. Detect installed applications.
+3. Customize the installation process.
+4. Uninstall applications (with limitations).
+
+---
+
+## Preparing for Deployment
+
+### Prerequisites
+
+- **Winget** must be installed on target devices.
+- Ensure the scripts `winget-install.ps1` and `winget-detect.ps1` are accessible.
+- Use a 64-bit version of PowerShell during deployment to avoid compatibility issues.
+
+### Files Required
+
+1. `winget-install.ps1` (main script for installations).
+2. `winget-detect.ps1` (script for detection methods).
+
+---
+
+## Creating an Intune Package
+
+### 1. Package the Scripts with IntuneWinAppUtil
+
+Use the [IntuneWinAppUtil](https://learn.microsoft.com/en-us/mem/intune/apps/apps-win32-app-management#prepare-the-win32-app-content) tool to package the `winget-install.ps1` script into a `.intunewin` file.
+
+1. Place `winget-install.ps1` in a folder (e.g., `Winget-Scripts`).
+2. Run the following command:
+   ```powershell
+   IntuneWinAppUtil.exe -c "Path\To\Winget-Scripts" -s winget-install.ps1 -o "Path\To\Output"
+   ```
+
+This creates an `.intunewin` file ready for upload.
+
+---
+
+### 2. Configure the Intune Application
+
+1. Go to **Microsoft Intune Admin Center** > **Apps** > **Add** > **Win32 app**.
+2. Upload the `.intunewin` file created earlier.
+3. Configure the **Program** tab:
+   - **Install Command**:  
+     ```powershell
+     "%systemroot%\sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File winget-install.ps1 -AppIDs <AppID>
+     ```
+     Replace `<AppID>` with the Winget App ID of the desired application (e.g., `Notepad++.Notepad++`).
+   - **Uninstall Command**:  
+     ```powershell
+     "%systemroot%\sysnative\WindowsPowerShell\v1.0\powershell.exe" -NoProfile -ExecutionPolicy Bypass -File winget-install.ps1 -AppIDs <AppID> -Uninstall
+     ```
+
+4. Configure the **Detection Rules** tab:
+   - Use the `winget-detect.ps1` script.
+   - Set `$AppToDetect` in `winget-detect.ps1` to the App ID (e.g., `Notepad++.Notepad++`).
+   - Upload the updated detection script to Intune.
+
+5. Set any other configurations as needed and assign the application to required devices/groups.
+
+---
+
+## Script Details
+
+### Installing Applications
+
+Use the following command to install applications:
+```powershell
+powershell.exe -ExecutionPolicy bypass -File winget-install.ps1 -AppIDs "<AppID>"
+```
+
+- Multiple applications can be installed by separating App IDs with commas:
+  ```powershell
+  powershell.exe -ExecutionPolicy bypass -File winget-install.ps1 -AppIDs "7zip.7zip, Notepad++.Notepad++"
+  ```
+
+### Using Native Winget Parameters
+
+Custom Winget parameters can be passed using the `AppIDs` argument:
+```powershell
+powershell.exe -ExecutionPolicy Bypass -File winget-install.ps1 -AppIDs "Citrix.Workspace --override \"/silent /noreboot /includeSSON /forceinstall\""
+```
+
+---
+
+### Uninstalling Applications
+
+Uninstall an application using:
+```powershell
+powershell.exe -ExecutionPolicy bypass -File winget-install.ps1 -AppIDs <AppID> -Uninstall
+```
+
+**Note**: Silent uninstalls may not always work. Use the application’s original uninstall command for better results.
+
+---
+
+## Mods (Customization)
+
+The script supports pre/post-install and uninstall hooks. Add custom scripts to the **Mods** directory with the following naming conventions:
+
+- **Before Install**: `<AppID>-preinstall.ps1`
+- **During Install**: `<AppID>-install.ps1`
+- **After Install Once**: `<AppID>-installed-once.ps1`
+- **After Install**: `<AppID>-installed.ps1`
+- **Before Uninstall**: `<AppID>-preuninstall.ps1`
+- **During Uninstall**: `<AppID>-uninstall.ps1`
+- **After Uninstall**: `<AppID>-uninstalled.ps1`
+
+Example: To run a custom script during the installation of `Notepad++`, create `Notepad++.Notepad++-install.ps1` and place it in the **Mods** directory.
+
+---
+
+## Detection Methods
+
+The `winget-detect.ps1` script checks for installed applications based on their App ID. Update the `$AppToDetect` variable with the relevant App ID:
+```powershell
+$AppToDetect = "Notepad++.Notepad++"
+```
+
+Use this script in SCCM or Intune as the detection method.
+
+---
+
+## Additional Resources
+
+- [Winget Documentation](https://learn.microsoft.com/en-us/windows/package-manager/winget/)
+- [Winget-AutoUpdate (WAU)](https://github.com/Romanitho/Winget-AutoUpdate)
+- [Winget-Intune-Win32](https://github.com/o-l-a-v/winget-intune-win32)
+
+---
+
 # Winget-Install (Will be part of WAU - Work in progress)
 Powershell scripts to install Winget Packages with SCCM/Intune (or similar) or even as standalone in system context (Inspired by [o-l-a-v](https://github.com/o-l-a-v) work)
 
